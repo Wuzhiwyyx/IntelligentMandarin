@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/bm1"
+        android:icon="@drawable/ic_home"
+        android:title="努力前行"/>
+    <item
+        android:id="@+id/bm2"
+        android:icon="@drawable/ic_history"
+        android:title="进步足迹"/>
+    <item
+        android:id="@+id/bm3"
+        android:icon="@drawable/ic_client"
+        android:title="我的专属"/>
+</menu>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_word"
+            android:icon="@drawable/ic_word"
+            android:title="字词练习" />
+        <item
+            android:id="@+id/nav_sentence"
+            android:icon="@drawable/ic_sentence"
+            android:title="句段练习" />
+        <item
+            android:id="@+id/nav_dialogue"
+            android:icon="@drawable/ic_chat_bubble"
+            android:title="情景对话" />
+    </group>
+</menu>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<litepal>
+    <dbname value="MandarinDatabase"/>
+    <version value="2"/>
+    <list>
+        <mapping class="com.example.wuzhi.intelligentmandarin.DataClass.Word"/>
+        <mapping class="com.example.wuzhi.intelligentmandarin.DataClass.Vocabulary"/>
+        <mapping class="com.example.wuzhi.intelligentmandarin.DataClass.Sentence"/>
+        <mapping class="com.example.wuzhi.intelligentmandarin.DataClass.LearnedSentence"/>
+        <mapping class="com.example.wuzhi.intelligentmandarin.DataClass.LearnedWord"/>
+        <mapping class="com.example.wuzhi.intelligentmandarin.DataClass.LearnedVocabulary"/>
+    </list>
+</litepal>
