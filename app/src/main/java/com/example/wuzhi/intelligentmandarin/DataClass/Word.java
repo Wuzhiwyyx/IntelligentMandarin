@@ -6,7 +6,7 @@ import org.litepal.crud.DataSupport;
  * Created by wuzhi on 2017/3/26.
  */
 
-public class Word extends DataSupport{
+public class Word extends DataSupport {
     private int id;
     private String word;
     private String pronounce;
@@ -71,4 +71,5 @@ public class Word extends DataSupport{
         learnedWord.setExample(example);
         return learnedWord;
     }
+
 }

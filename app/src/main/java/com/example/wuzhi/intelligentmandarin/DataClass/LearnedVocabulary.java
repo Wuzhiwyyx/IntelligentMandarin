@@ -8,7 +8,7 @@ import java.util.Date;
  * Created by wuzhi on 2017/3/26.
  */
 
-public class LearnedVocabulary extends DataSupport {
+public class LearnedVocabulary extends DataSupport implements ExerciseDataSource{
     private int id;
     private String vocabulary;
     private String pronounce;
@@ -84,5 +84,17 @@ public class LearnedVocabulary extends DataSupport {
 
     public LearnedVocabulary() {
         score = 0.0;
+    }
+
+    @Override
+    public int getType() {
+        return LEARNED_VOCABULARY;
+    }
+
+    @Override
+    public void saveData(Double score) {
+        setScore(score);
+        setLastAccess(new Date());
+        save();
     }
 }

@@ -6,7 +6,7 @@ import org.litepal.crud.DataSupport;
  * Created by wuzhi on 2017/3/26.
  */
 
-public class Sentence extends DataSupport{
+public class Sentence extends DataSupport {
     private int id;
     private String sentence;
 
@@ -31,4 +31,5 @@ public class Sentence extends DataSupport{
         learnedSentence.setSentence(sentence);
         return learnedSentence;
     }
+
 }

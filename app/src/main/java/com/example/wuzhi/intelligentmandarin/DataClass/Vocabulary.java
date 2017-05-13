@@ -71,4 +71,5 @@ public class Vocabulary extends DataSupport {
         learnedVocabulary.setExample(example);
         return learnedVocabulary;
     }
+
 }

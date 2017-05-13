@@ -34,12 +34,6 @@
             android:layout_above="@id/bottom_navigationView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
-        <!--<Button-->
-        <!--android:id="@+id/connectTest"-->
-        <!--android:layout_width="wrap_content"-->
-        <!--android:layout_height="wrap_content"-->
-        <!--android:layout_alignParentRight="true"-->
-        <!--android:text="connectTest"/>-->
 
     </RelativeLayout>
     <android.support.design.widget.NavigationView

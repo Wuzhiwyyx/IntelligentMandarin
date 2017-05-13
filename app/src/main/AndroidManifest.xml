@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:name="org.litepal.LitePalApplication"
@@ -23,18 +24,19 @@
         android:theme="@style/AppTheme">
         <activity
             android:name=".MainActivity"
-            android:label="智能普通话测试">
+            android:label="智能普通话测试"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".TrainWordVocabularyActivity" />
-        <activity android:name=".TrainSentenceParagraphActivity" />
         <activity android:name=".DialogueActivity" />
-        <activity android:name=".DailyWordVocabularyActivity" />
-        <activity android:name=".DailySentenceParagraphActivity"></activity>
+        <activity android:name=".TrainActivity" />
+        <activity android:name=".WelcomeActivity">
+
+        </activity>
     </application>
 
 </manifest>

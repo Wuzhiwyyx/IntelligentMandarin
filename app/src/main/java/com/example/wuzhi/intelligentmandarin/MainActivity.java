@@ -33,6 +33,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.wuzhi.intelligentmandarin.DataClass.ExerciseDataSource;
 import com.example.wuzhi.intelligentmandarin.DataClass.LearnedSentence;
 import com.example.wuzhi.intelligentmandarin.DataClass.LearnedVocabulary;
 import com.example.wuzhi.intelligentmandarin.DataClass.LearnedWord;
@@ -49,6 +50,7 @@ import org.litepal.crud.DataSupport;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -72,34 +74,29 @@ import okhttp3.Response;
 public class MainActivity extends AppCompatActivity {
 
     private DrawerLayout drawer_layout;
-    private Button startDailyExercise;
     private TextView days, todayCount, scale;
     private ProgressBar progressBar;
     private SharedPreferences pref;
     private SharedPreferences.Editor editor;
 
-    public static int wordNum;
-    public static int vocabularyNum;
-    public static int sentenceNum;
-    public static int wordPerDay = 5;
-    public static int vocabularyPerDay = 5;
-    public static int sentencePerDay = 5;
-    public static int requestCount = 1;
-    public static String voicer;
 
-    public static List<Word> todayWords = new ArrayList<>();
-    public static List<Vocabulary> todayVocabularies = new ArrayList<>();
-    public static List<Sentence> todaySentences = new ArrayList<>();
+    public static int wordPerDay = 5;//每日练习字数上限
+    public static int vocabularyPerDay = 5;//每日练习词数上限
+    public static int sentencePerDay = 5;//每日练习句数上限
+    public static int requestCount = 1;//请求后台数据量（后续会删除此变量）
+    public static String voice;//声源
+
+    public static List<ExerciseDataSource> dailyExerciseDataSources = new ArrayList<>();//每日训练数据集
+    public static List<ExerciseDataSource> wordTrainDataSources = new ArrayList<>();//字词专项训练数据集
+    public static List<ExerciseDataSource> sentenceDataSources = new ArrayList<>();//句段专项训练数据集
 
     private ViewPager viewPager;
     private MenuItem menuItem;
     private BottomNavigationView bottomNavigationView;
 
     private LineChartView lineChart;
-//    String[] date = {"3-31", "4-1", "4-2", "4-3", "4-4"};//X轴的标注
-    List<String> dates = new ArrayList<>();
-//    float[] score = {5.0f, 4.2f, 4.0f, 3.3f, 4.1f};//图表的数据点
-    List<Double> scores = new ArrayList<>();
+    List<String> dates = new ArrayList<>();//X轴的标注
+    List<Double> scores = new ArrayList<>();//图表的数据点
     private List<PointValue> mPointValues = new ArrayList<>();
     private List<AxisValue> mAxisXValues = new ArrayList<>();
 
@@ -110,13 +107,13 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         initOriginalView();
         SpeechUtility.createUtility(MainActivity.this, SpeechConstant.APPID +"=583c506b");
-//        Button button = (Button) findViewById(R.id.connectTest);
-//        button.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                showNotification((new Random()).nextInt(10), "sdfsdf", "dfsfsd");
-//            }
-//        });
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                prepareDailyDataSource();
+                prepareTrainDataSource();
+            }
+        }).start();
     }
 
     private class ViewPagerAdapter extends PagerAdapter {
@@ -162,38 +159,19 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean onNavigationItemSelected(MenuItem item) {
                 drawer_layout.closeDrawers();
-                Intent toWordVocabulary = new Intent(MainActivity.this, TrainWordVocabularyActivity.class);
-                Intent toSentenceParagraph = new Intent(MainActivity.this, TrainSentenceParagraphActivity.class);
+                Intent intent = new Intent(MainActivity.this, TrainActivity.class);
                 switch (item.getItemId()) {
                     case R.id.nav_word:
-                        toWordVocabulary.putExtra("category", "read_syllable");
-                        toWordVocabulary.putExtra("title", item.getTitle());
-                        toWordVocabulary.putExtra("isSelf", false);
-                        startActivityForResult(toWordVocabulary, 1);
+                        intent.putExtra("trainMethod", 1);
+                        startActivityForResult(intent, 1);
                         break;
-//                    case R.id.nav_vocabulary:
-//                        toWordVocabulary.putExtra("category", "read_word");
-//                        toWordVocabulary.putExtra("title", item.getTitle());
-//                        toWordVocabulary.putExtra("isSelf", false);
-//                        startActivityForResult(toWordVocabulary, 2);
-//                        break;
                     case R.id.nav_sentence:
-                        toSentenceParagraph.putExtra("category", "read_sentence");
-                        toSentenceParagraph.putExtra("title", item.getTitle());
-                        toSentenceParagraph.putExtra("isParagraph", false);
-                        toSentenceParagraph.putExtra("isSelf", false);
-                        startActivityForResult(toSentenceParagraph, 3);
+                        intent.putExtra("trainMethod", 2);
+                        startActivityForResult(intent, 2);
                         break;
-//                    case R.id.nav_paragraph:
-//                        toSentenceParagraph.putExtra("category", "read_sentence");
-//                        toSentenceParagraph.putExtra("title", item.getTitle());
-//                        toSentenceParagraph.putExtra("isParagraph", true);
-//                        toSentenceParagraph.putExtra("isSelf", false);
-//                        startActivityForResult(toSentenceParagraph, 4);
-//                        break;
                     case R.id.nav_dialogue:
                         Intent dIntent = new Intent(MainActivity.this, DialogueActivity.class);
-                        startActivityForResult(dIntent, 5);
+                        startActivityForResult(dIntent, 3);
                         break;
                 }
                 return true;
@@ -319,39 +297,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public View getPageMain() {
+
         View pageMain = getLayoutInflater().inflate(R.layout.page_main, null);
-        startDailyExercise = (Button) pageMain.findViewById(R.id.startDailyExercise);
+        Button startDailyExercise = (Button) pageMain.findViewById(R.id.startDailyExercise);
         startDailyExercise.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent();
-                if (wordNum < wordPerDay) {
-                    intent.setClass(MainActivity.this, DailyWordVocabularyActivity.class);
-                    intent.putExtra("category", "read_syllable");
-                    intent.putExtra("isSelf", false);
-                    intent.putExtra("wordNum", wordNum);
-                    intent.putExtra("vocabularyNum", vocabularyNum);
-                    intent.putExtra("sentenceNum", sentenceNum);
-                    startActivityForResult(intent, 2);
-                } else if (vocabularyNum < vocabularyPerDay) {
-                    intent.setClass(MainActivity.this, DailyWordVocabularyActivity.class);
-                    intent.putExtra("category", "read_word");
-                    intent.putExtra("isSelf", false);
-                    intent.putExtra("wordNum", wordNum);
-                    intent.putExtra("vocabularyNum", vocabularyNum);
-                    intent.putExtra("sentenceNum", sentenceNum);
-                    startActivityForResult(intent, 4);
-                } else if (sentenceNum < sentencePerDay){
-                    intent.setClass(MainActivity.this, DailySentenceParagraphActivity.class);
-                    intent.putExtra("category", "read_sentence");
-                    intent.putExtra("isSelf", false);
-                    intent.putExtra("wordNum", wordNum);
-                    intent.putExtra("vocabularyNum", vocabularyNum);
-                    intent.putExtra("sentenceNum", sentenceNum);
-                    startActivityForResult(intent, 6);
-                } else {
-                    Toast.makeText(MainActivity.this, "暂时无新数据", Toast.LENGTH_SHORT).show();
-                }
+                Intent intent = new Intent(MainActivity.this, TrainActivity.class);
+                intent.putExtra("trainMethod", 0);
+                startActivityForResult(intent, 0);
             }
         });
 
@@ -374,7 +328,6 @@ public class MainActivity extends AppCompatActivity {
         todayCount = (TextView) pageMain.findViewById(R.id.todayCount);
         scale = (TextView) pageMain.findViewById(R.id.scale);
         progressBar = (ProgressBar) pageMain.findViewById(R.id.progressBar);
-
 
         updateData();
         return pageMain;
@@ -523,8 +476,8 @@ public class MainActivity extends AppCompatActivity {
         requestCountBar.setProgress(pref.getInt("requestCount", requestCount - 1));
         requestCountText.setText(String.valueOf(pref.getInt("requestCount", requestCount - 1) + 1));
         RadioGroup voiceGroup = (RadioGroup) pageExclusive.findViewById(R.id.voiceGroup);
-        voicer = pref.getString("voicer", "xiaoyan");
-        if (voicer.equals("xiaoyan")) {
+        voice = pref.getString("voice", "xiaoyan");
+        if (voice.equals("xiaoyan")) {
             voiceGroup.check(R.id.voiceFemale);
         } else {
             voiceGroup.check(R.id.voiceMale);
@@ -534,15 +487,15 @@ public class MainActivity extends AppCompatActivity {
             public void onCheckedChanged(RadioGroup group, @IdRes int checkedId) {
                 switch (checkedId) {
                     case R.id.voiceMale:
-                        voicer = "xiaoyu";
+                        voice = "xiaoyu";
                         break;
                     case R.id.voiceFemale:
-                        voicer = "xiaoyan";
+                        voice = "xiaoyan";
                         break;
                 }
-                editor.putString("voicer", voicer);
+                editor.putString("voice", voice);
                 editor.apply();
-                Toast.makeText(MainActivity.this, voicer, Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, voice, Toast.LENGTH_SHORT).show();
             }
         });
         return pageExclusive;
@@ -613,6 +566,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         updateData();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                prepareTrainDataSource();
+            }
+        }).start();
     }
 
     @Override
@@ -795,35 +754,35 @@ public class MainActivity extends AppCompatActivity {
         sentence1.save();
 
         Sentence sentence2 = new Sentence();
-        sentence2.setSentence("如果体育运动能对我们有所教益的话, 那么这教益便是: 精心的准备能够使运动员获得成功。");
+        sentence2.setSentence("精心的准备能够使运动员获得成功。");
         sentence2.save();
 
         Sentence sentence3 = new Sentence();
-        sentence3.setSentence("研究表明, 在你即将走上台开始讲话的那段时间里, 在你第一次与听众接触的那一刻, 你的恐惧感最为强烈。");
+        sentence3.setSentence("研究表明, 在你第一次与听众接触的那一刻, 你的恐惧感最为强烈。");
         sentence3.save();
 
         Sentence sentence4 = new Sentence();
-        sentence4.setSentence("夕阳落山不久，西方的天空，还燃烧着一片橘红色的晚霞。大海，也被这霞光染成了红色，而且比天空的景色更要壮观。");
+        sentence4.setSentence("夕阳落山不久，西方的天空，还燃烧着一片橘红色的晚霞。");
         sentence4.save();
 
         Sentence sentence5 = new Sentence();
-        sentence5.setSentence("最妙的是下点小雪呀。看吧，山上的矮松越发的青黑，树尖儿上顶 // 着一髻儿白花，好像日本看护妇。山尖儿全白了，给蓝天镶上一道银边。");
+        sentence5.setSentence("看吧，山上的矮松越发的青黑，树尖儿上顶着一髻儿白花，好像日本看护妇。");
         sentence5.save();
 
         Sentence sentence6 = new Sentence();
-        sentence6.setSentence("最早出现的启明星，在这蓝色的天幕上闪烁起来了。它是那么大，那么亮，整个广漠的天幕上只有它在那里放射着令人注目的光辉，活像一盏悬挂在高空的明灯。");
+        sentence6.setSentence("最早出现的启明星，在这蓝色的天幕上闪烁起来了。");
         sentence6.save();
 
         Sentence sentence7 = new Sentence();
-        sentence7.setSentence("夜色加浓，苍空中的“明灯”越来越多了。而城市各处的真的灯火也次第亮了起来，尤其是围绕在海港周围山坡上的那一片灯光，从半空倒映在乌蓝的海面上，随着波浪，晃动着，闪烁着，像一串流动着的珍珠，和那一片片密布在苍穹里的星斗互相辉映，煞是好看。");
+        sentence7.setSentence("夜色加浓，苍空中的“明灯”越来越多了。");
         sentence7.save();
 
         Sentence sentence8 = new Sentence();
-        sentence8.setSentence("在达瑞八岁的时候，有一天他想去看电影。因为没有钱，他想是向爸妈要钱，还是自己挣钱。最后他选择了后者。他自己调制了一种汽水，向过路的行人出售。可那时正是寒冷的冬天，没有人买，只有两个人例外——他的爸爸和妈妈。");
+        sentence8.setSentence("他自己调制了一种汽水，向过路的行人出售。可那时正是寒冷的冬天，没有人买，只有两个人例外——他的爸爸和妈妈。");
         sentence8.save();
 
         Sentence sentence9 = new Sentence();
-        sentence9.setSentence("对于一个在北平住惯的人，像我，冬天要是不刮风，便觉得是奇迹;济南的冬天是没有风声的。对于一个刚由伦敦回来的人，像我，冬天要能看得见日光，便觉得是怪事;济南的冬天是响晴的。");
+        sentence9.setSentence("济南的冬天是没有风声的,济南的冬天是响晴的。");
         sentence9.save();
 
         Calendar calendar = Calendar.getInstance();
@@ -904,46 +863,53 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void updateData() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-        if (pref.getBoolean("isFirstTime", true)) {
-            editor.putBoolean("isFirstTime", false);
-            String firstTime = sdf.format(new Date());
-            editor.putString("firstTime", firstTime);
-            editor.apply();
-        } else {
-            try {
-                Date firstTime = sdf.parse(pref.getString("firstTime", sdf.format(new Date())));
-//                long l = (new Date()).getTime() - firstTime.getTime();
-//                long day = l / (24 * 60 * 60 * 1000);
-                List<LearnedWord> lws = DataSupport.findAll(LearnedWord.class);
-                List<LearnedVocabulary> lvs = DataSupport.findAll(LearnedVocabulary.class);
-                List<LearnedSentence> lss = DataSupport.findAll(LearnedSentence.class);
-                days.setText(String.valueOf(alreadyInsist(lws, lvs, lss, firstTime.getTime())));
-            } catch (Exception e) {
-                e.printStackTrace();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                if (pref.getBoolean("isFirstTime", true)) {
+                    editor.putBoolean("isFirstTime", false);
+                    String firstTime = sdf.format(new Date());
+                    editor.putString("firstTime", firstTime);
+                    editor.apply();
+                } else {
+                    try {
+                        Date firstTime = sdf.parse(pref.getString("firstTime", sdf.format(new Date())));
+                        List<LearnedWord> lws = DataSupport.findAll(LearnedWord.class);
+                        List<LearnedVocabulary> lvs = DataSupport.findAll(LearnedVocabulary.class);
+                        List<LearnedSentence> lss = DataSupport.findAll(LearnedSentence.class);
+                        days.setText(String.valueOf(daysInsisted(lws, lvs, lss, firstTime.getTime())));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTime(new Date());
+                calendar.set(Calendar.HOUR_OF_DAY, 0);
+                calendar.set(Calendar.MINUTE, 0);
+                calendar.set(Calendar.SECOND, 0);
+                calendar.set(Calendar.MILLISECOND, 0);
+                final int wordNum = DataSupport.where("lastAccess >= ?", String.valueOf(calendar.getTime().getTime())).find(LearnedWord.class).size();
+                final int vocabularyNum = DataSupport.where("lastAccess >= ?", String.valueOf(calendar.getTime().getTime())).find(LearnedVocabulary.class).size();
+                final int sentenceNum = DataSupport.where("lastAccess >= ?", String.valueOf(calendar.getTime().getTime())).find(LearnedSentence.class).size();
+                final int total = DataSupport.findAll(Word.class).size() + DataSupport.findAll(Vocabulary.class).size() + DataSupport.findAll(Sentence.class).size();
+                final int learned = DataSupport.findAll(LearnedWord.class).size() + DataSupport.findAll(LearnedVocabulary.class).size() + DataSupport.findAll(LearnedSentence.class).size();
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        todayCount.setText(String.valueOf(wordNum + vocabularyNum + sentenceNum));
+                        scale.setText(String.valueOf(learned) + "/" + String.valueOf(total));
+                        progressBar.setMax(total);
+                        progressBar.setProgress(learned);
+                    }
+                });
             }
-        }
-
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(new Date());
-        calendar.set(Calendar.HOUR_OF_DAY, 0);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
-        wordNum = DataSupport.where("lastAccess >= ?", String.valueOf(calendar.getTime().getTime())).find(LearnedWord.class).size();
-        vocabularyNum = DataSupport.where("lastAccess >= ?", String.valueOf(calendar.getTime().getTime())).find(LearnedVocabulary.class).size();
-        sentenceNum = DataSupport.where("lastAccess >= ?", String.valueOf(calendar.getTime().getTime())).find(LearnedSentence.class).size();
-
-        todayCount.setText(String.valueOf(wordNum + vocabularyNum + sentenceNum));
-        int total = DataSupport.findAll(Word.class).size() + DataSupport.findAll(Vocabulary.class).size() + DataSupport.findAll(Sentence.class).size();
-        int learned = DataSupport.findAll(LearnedWord.class).size() + DataSupport.findAll(LearnedVocabulary.class).size() + DataSupport.findAll(LearnedSentence.class).size();
-        scale.setText(String.valueOf(learned) + "/" + String.valueOf(total));
-        progressBar.setMax(total);
-        progressBar.setProgress(learned);
+        }).start();
     }
 
     public void showNotification(int i, String title, String content) {
-
         Intent intent = new Intent(this, MainActivity.class);
         PendingIntent pi = PendingIntent.getActivity(this, 0, intent, 0);
         NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -959,7 +925,7 @@ public class MainActivity extends AppCompatActivity {
         manager.notify(i, notification);
     }
 
-    public Long alreadyInsist(List<LearnedWord> learnedWords, List<LearnedVocabulary> learnedVocabularies, List<LearnedSentence> learnedSentences, long firstDay) {
+    public Long daysInsisted(List<LearnedWord> learnedWords, List<LearnedVocabulary> learnedVocabularies, List<LearnedSentence> learnedSentences, long firstDay) {
         Set<Long> set = new HashSet<>();
         for (LearnedWord learnedWord:learnedWords) {
             set.add((learnedWord.getLastAccess().getTime()-firstDay)/ (24 * 60 * 60 * 1000));
@@ -971,5 +937,79 @@ public class MainActivity extends AppCompatActivity {
             set.add((learnedSentence.getLastAccess().getTime()-firstDay)/(24 * 60 * 60 * 1000));
         }Log.d("insist", String.valueOf(set.size()));
         return (long) set.size();
+    }
+
+    public void prepareDailyDataSource() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(new Date());
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Log.d("prepareDailyDataSource", sdf.format(calendar.getTime()));
+        for (LearnedWord w : DataSupport.findAll(LearnedWord.class)) {
+            Log.d("prepareDailyDataSource", sdf.format(w.getLastAccess()));
+        }
+        List<LearnedWord> learnedWords = DataSupport.where("lastAccess >= ?", String.valueOf(calendar.getTime().getTime())).find(LearnedWord.class);
+        List<LearnedVocabulary> learnedVocabularies = DataSupport.where("lastAccess >= ?", String.valueOf(calendar.getTime().getTime())).find(LearnedVocabulary.class);
+        List<LearnedSentence> learnedSentences = DataSupport.where("lastAccess >= ?", String.valueOf(calendar.getTime().getTime())).find(LearnedSentence.class);
+        List<Word> words = DataSupport.findAll(Word.class);
+        List<Vocabulary> vocabularies = DataSupport.findAll(Vocabulary.class);
+        List<Sentence> sentences = DataSupport.findAll(Sentence.class);
+        dailyExerciseDataSources.addAll(learnedWords);
+        for (Word w : words) {
+            if (!DataSupport.isExist(LearnedWord.class, "word = ?", w.getWord())) {
+                if (dailyExerciseDataSources.size() <= wordPerDay) {
+                    dailyExerciseDataSources.add(w.toLearnedWord());
+                } else {
+                    break;
+                }
+            }
+        }
+        dailyExerciseDataSources.addAll(learnedVocabularies);
+        for (Vocabulary v : vocabularies) {
+            if (!DataSupport.isExist(LearnedVocabulary.class, "vocabulary = ?", v.getVocabulary())) {
+                if (dailyExerciseDataSources.size() <= wordPerDay + vocabularyPerDay) {
+                    dailyExerciseDataSources.add(v.toLearnedVocabulary());
+                } else {
+                    break;
+                }
+            }
+        }
+        dailyExerciseDataSources.addAll(learnedSentences);
+        for (Sentence s : sentences) {
+            if (!DataSupport.isExist(LearnedSentence.class, "sentence = ?", s.getSentence())) {
+                if (dailyExerciseDataSources.size() <= wordPerDay + vocabularyPerDay + sentencePerDay) {
+                    dailyExerciseDataSources.add(s.toLearnedSentence());
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    public void prepareTrainDataSource() {
+        wordTrainDataSources.addAll(DataSupport.findAll(LearnedWord.class));
+        wordTrainDataSources.addAll(DataSupport.findAll(LearnedVocabulary.class));
+        Collections.shuffle(wordTrainDataSources);
+        List<ExerciseDataSource> tempList = new ArrayList<>();
+        for (Word w : DataSupport.findAll(Word.class)) {
+            tempList.add(w.toLearnedWord());
+        }
+        for (Vocabulary v : DataSupport.findAll(Vocabulary.class)) {
+            tempList.add(v.toLearnedVocabulary());
+        }
+        Collections.shuffle(tempList);
+        wordTrainDataSources.addAll(tempList);
+
+        sentenceDataSources.addAll(DataSupport.findAll(LearnedSentence.class));
+        Collections.shuffle(sentenceDataSources);
+        tempList.clear();
+        for (Sentence s : DataSupport.findAll(Sentence.class)) {
+            tempList.add(s.toLearnedSentence());
+        }
+        Collections.shuffle(tempList);
+        sentenceDataSources.addAll(tempList);
     }
 }
